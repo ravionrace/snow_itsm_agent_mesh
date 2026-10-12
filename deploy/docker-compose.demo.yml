@@ -1,0 +1,106 @@
+# DEMO stack for one small VM (t3.medium: 2 vCPU, 4 GB) connected to a ServiceNow PDI. See docs/deploy-demo.md.
+#
+# What makes it a demo rather than production (use docker-compose.yml for that):
+#   - DEV sign-in: the chat UI's "Dev user" field is the ServiceNow user_name the agents act as. There is no IdP,
+#     so the API is published on 127.0.0.1 only; reach it through an SSH tunnel and never open the port.
+#   - Sessions in memory and audit/cost in SQLite (no MongoDB / MySQL) to fit in ~2 GB; a restart clears chats.
+# What is real: OAuth to ServiceNow (signed JWT assertion, per-user tokens), the Access agent and every guardrail.
+#
+# The ServiceNow in-app Assistant reaches this VM through nginx on the host (HTTPS on PUBLIC_HOST, set up by
+# deploy/scripts/setup-nginx.sh), which forwards only /channel/servicenow/* to the orchestrator on 127.0.0.1:8080 -
+# calls the instance signs with the channel secret. See docs/servicenow-assistant.md.
+x-java-env: &java-env
+  # Measured ~160 MB per service with these flags.
+  JAVA_TOOL_OPTIONS: >-
+    -XX:+UseSerialGC -Xmx160m -Xss512k -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=48m
+    -XX:TieredStopAtLevel=1
+  ITSM_ENVIRONMENT: development
+
+x-mcp: &mcp
+  restart: unless-stopped
+  mem_limit: 384m
+  networks: [mesh]
+  environment:
+    <<: *java-env
+    SN_INSTANCE_URL: ${SN_INSTANCE_URL:?set SN_INSTANCE_URL in deploy/.env}
+    SN_APP_SCOPE: ${SN_APP_SCOPE:-x_1320561_itsm_ai}
+    SECRETS_DIR: /run/secrets/
+  secrets:
+    - source: mesh_key
+      target: itsm.mcp.mesh-key
+    - source: confirmation_secret
+      target: itsm.mcp.confirmation.secret
+
+services:
+  mcp-incident:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-incident}}
+  mcp-problem:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-problem}}
+  mcp-change:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-change}}
+  mcp-catalog:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-catalog}}
+  mcp-cmdb-kb:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-cmdb-kb}}
+  mcp-access:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-access}}
+
+  agent-runtime:
+    build: {context: .., dockerfile: deploy/runtime.Dockerfile}
+    restart: unless-stopped
+    mem_limit: 640m
+    depends_on: [mcp-incident, mcp-problem, mcp-change, mcp-catalog, mcp-cmdb-kb, mcp-access]
+    environment:
+      MESH_ENVIRONMENT: development
+      MESH_ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      MESH_RUNTIME_API_KEY_FILE: /run/secrets/runtime_api_key
+      MESH_MCP_MESH_KEY_FILE: /run/secrets/mesh_key
+      MESH_DATABASE_URL: sqlite:////data/itsm_mesh.db
+      MESH_MCP_SERVERS: '{"incident":"http://mcp-incident:8081/mcp","problem":"http://mcp-problem:8082/mcp","change":"http://mcp-change:8083/mcp","catalog":"http://mcp-catalog:8084/mcp","cmdb_kb":"http://mcp-cmdb-kb:8085/mcp","access":"http://mcp-access:8086/mcp"}'
+    secrets: [anthropic_api_key, runtime_api_key, mesh_key]
+    volumes: [runtime-data:/data]
+    networks: [mesh]
+
+  orchestrator:
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: orchestrator}}
+    restart: unless-stopped
+    mem_limit: 384m
+    depends_on: [agent-runtime]
+    # Loopback only: host nginx proxies /channel/servicenow/* here; the DEV UI and /api must never be public.
+    ports: ["127.0.0.1:8080:8080"]
+    environment:
+      <<: *java-env
+      AUTH_MODE: DEV
+      SESSION_STORE: memory
+      RUNTIME_URL: http://agent-runtime:8090
+      RUNTIME_API_KEY_FILE: /run/secrets/runtime_api_key
+      SN_TOKEN_MODE: SIGNED_ASSERTION
+      SN_INSTANCE_URL: ${SN_INSTANCE_URL:?set SN_INSTANCE_URL in deploy/.env}
+      SN_OAUTH_CLIENT_ID: ${SN_OAUTH_CLIENT_ID:?set SN_OAUTH_CLIENT_ID in deploy/.env}
+      SN_OAUTH_KEY_ID: ${SN_OAUTH_KEY_ID:?set SN_OAUTH_KEY_ID in deploy/.env}
+      SN_OAUTH_CLIENT_SECRET_FILE: /run/secrets/sn_oauth_client_secret
+      SN_OAUTH_PRIVATE_KEY_FILE: /run/secrets/sn_oauth_private_key
+      CHANNEL_ENABLED: "true"
+      CHANNEL_SECRET_FILE: /run/secrets/channel_secret
+    secrets: [runtime_api_key, sn_oauth_client_secret, sn_oauth_private_key, channel_secret]
+    networks: [mesh]
+
+secrets:
+  mesh_key: {file: ./secrets/mesh_key}
+  confirmation_secret: {file: ./secrets/confirmation_secret}
+  runtime_api_key: {file: ./secrets/runtime_api_key}
+  anthropic_api_key: {file: ./secrets/anthropic_api_key}
+  sn_oauth_client_secret: {file: ./secrets/sn_oauth_client_secret}
+  sn_oauth_private_key: {file: ./secrets/sn_oauth_private_key}
+  channel_secret: {file: ./secrets/channel_secret}
+
+networks:
+  mesh: {}
+volumes:
+  runtime-data: {}

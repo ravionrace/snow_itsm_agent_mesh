@@ -1,0 +1,53 @@
+.assistant { display: flex; flex-direction: column; height: 100vh; max-width: 960px; margin: 0 auto; padding: 12px 16px;
+    box-sizing: border-box; font-family: var(--now-font-family, 'Lato', sans-serif); }
+.assistant-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 8px;
+    border-bottom: 1px solid rgb(var(--now-color--neutral-3, 219, 221, 222)); }
+.caption { font-size: 0.8125rem; color: rgb(var(--now-color--neutral-12, 82, 91, 97)); }
+.chat-window { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 16px 0; }
+.chat-empty { color: rgb(var(--now-color--neutral-12, 82, 91, 97)); }
+.bubble { max-width: 80%; padding: 10px 14px; border-radius: 12px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
+.bubble-user { align-self: flex-end; background: rgb(var(--now-color_brand--primary-1, 222, 234, 255)); }
+.bubble-assistant { align-self: flex-start; background: rgb(var(--now-color--neutral-1, 244, 245, 245)); }
+.bubble-event, .bubble-notice { align-self: center; font-size: 0.8125rem; color: rgb(var(--now-color--neutral-12, 82, 91, 97)); background: none; }
+.bubble-error { align-self: flex-start; background: rgb(var(--now-color_alert--critical-0, 255, 235, 235)); }
+.bubble-meta { font-size: 0.75rem; font-weight: 600; margin-bottom: 4px; color: rgb(var(--now-color--neutral-12, 82, 91, 97)); }
+.chat-thinking { align-self: flex-start; }
+.pending-card { align-self: stretch; max-width: 640px; }
+.changes { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin: 8px 0; }
+.changes td { padding: 4px 6px; border-top: 1px solid rgb(var(--now-color--neutral-3, 219, 221, 222)); vertical-align: top; overflow-wrap: anywhere; }
+.changes td:first-child { width: 30%; color: rgb(var(--now-color--neutral-12, 82, 91, 97)); }
+.warning { font-size: 0.8125rem; color: rgb(var(--now-color_alert--warning-3, 151, 81, 0)); }
+.pending-actions { display: flex; gap: 8px; margin-top: 8px; }
+.composer { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; padding-top: 8px;
+    border-top: 1px solid rgb(var(--now-color--neutral-3, 219, 221, 222)); }
+@media (max-width: 600px) { .bubble { max-width: 92%; } .assistant { padding: 8px; } }
+
+/* Markdown replies: the bubble's pre-wrap is for plain text only */
+.bubble-assistant { white-space: normal; }
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+.markdown p, .markdown ul, .markdown ol, .markdown pre, .markdown blockquote, .markdown table { margin: 0 0 8px; }
+.markdown ul, .markdown ol { padding-left: 20px; }
+.markdown h1, .markdown h2, .markdown h3, .markdown h4 { font-size: 1rem; margin: 10px 0 6px; }
+.markdown code { font-family: var(--now-font-family--monospace, Menlo, Consolas, monospace); font-size: 0.85em;
+    background: rgb(var(--now-color--neutral-3, 219, 221, 222)); padding: 1px 4px; border-radius: 4px; }
+.markdown pre { overflow-x: auto; padding: 8px; border-radius: 6px; background: rgb(var(--now-color--neutral-3, 219, 221, 222)); }
+.markdown pre code { background: none; padding: 0; }
+.markdown blockquote { border-left: 3px solid rgb(var(--now-color--neutral-5, 175, 180, 182)); padding-left: 10px; color: rgb(var(--now-color--neutral-12, 82, 91, 97)); }
+.markdown table { border-collapse: collapse; display: block; overflow-x: auto; font-size: 0.875rem; }
+.markdown th, .markdown td { border: 1px solid rgb(var(--now-color--neutral-3, 219, 221, 222)); padding: 4px 8px; text-align: left; vertical-align: top; }
+.markdown th { background: rgb(var(--now-color--neutral-3, 219, 221, 222)); }
+.markdown a { color: rgb(var(--now-color_brand--primary-3, 3, 102, 214)); }
+
+/* How the agents worked: live under the loader, collapsed above each reply */
+.chat-thinking { display: flex; flex-direction: column; gap: 6px; max-width: 80%; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px;
+    font-size: 0.8125rem; color: rgb(var(--now-color--neutral-12, 82, 91, 97)); }
+.step { display: flex; gap: 6px; align-items: baseline; }
+.step-icon { flex: none; width: 1.2em; text-align: center; }
+.step-warn { color: rgb(var(--now-color_alert--warning-3, 151, 81, 0)); }
+.step-thinking { font-style: italic; white-space: pre-wrap; overflow-wrap: anywhere; }
+.step code { font-size: 0.95em; }
+.steps-details { margin-bottom: 6px; }
+.steps-details summary { cursor: pointer; font-size: 0.75rem; color: rgb(var(--now-color--neutral-12, 82, 91, 97)); }
+.steps-details .steps { margin-top: 4px; padding: 6px 8px; border-left: 2px solid rgb(var(--now-color--neutral-3, 219, 221, 222)); }

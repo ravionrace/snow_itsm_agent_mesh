@@ -1,0 +1,27 @@
+# Blocks any change to prompts, agent definitions, guardrails or tools that lowers eval scores.
+# Runs the golden + adversarial replay against real models with fixture MCP servers (no ServiceNow writes).
+# Costs model tokens on every run.
+name: evals
+on:
+  pull_request:
+    paths:
+      - "agent-runtime/src/itsm_agents/**"
+      - "mcp-*/src/main/java/**/*Tools.java"
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: agent-runtime}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.13"}
+      - run: pip install -e .
+      - name: Replay golden and adversarial sets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MESH_DATABASE_URL: sqlite:///./evals.db
+        run: itsm-evals --suite all --report eval-report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: eval-report, path: agent-runtime/eval-report.json}

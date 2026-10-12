@@ -1,0 +1,6 @@
+{
+  "scope": "x_1320561_itsm_ai",
+  "scopeId": "35cb4473936d46dcb81b6f802df2d873",
+  "name": "ITSM AI Agent API",
+  "tsconfigPath": "./src/server/tsconfig.json"
+}

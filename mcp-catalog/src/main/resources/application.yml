@@ -1,0 +1,48 @@
+server:
+  port: ${PORT:8084}
+
+spring:
+  config:
+    # Production secrets are files named after the property (e.g. itsm.mcp.mesh-key) in this directory.
+    import: optional:configtree:${SECRETS_DIR:/run/secrets/}
+  application:
+    name: mcp-catalog
+  ai:
+    mcp:
+      server:
+        name: catalog-mcp
+        version: 0.1.0
+        type: SYNC
+        protocol: STATELESS
+        instructions: >
+          Service catalog tools for ServiceNow: find, fill in and order catalog items the user is entitled to.
+        annotation-scanner:
+          enabled: true
+
+itsm:
+  # "production" refuses development-only settings at start-up.
+  environment: ${ITSM_ENVIRONMENT:development}
+  mcp:
+    endpoint: /mcp
+    # Shared secret the orchestrator sends as X-Mesh-Key. Empty disables the check (local dev only).
+    mesh-key: ${MESH_KEY:}
+    servicenow:
+      instance-url: ${SN_INSTANCE_URL:https://example.service-now.com}
+      namespace: ${SN_APP_SCOPE:x_1320561_itsm_ai}
+      api: catalog
+      version: v1
+      connect-timeout: 3s
+      read-timeout: ${SN_READ_TIMEOUT:15s}
+    confirmation:
+      secret: ${CONFIRMATION_SECRET:dev-only-confirmation-secret-change-me-0000}
+      ttl: 10m
+    rate-limit:
+      permits-per-second: ${SN_RATE_LIMIT:10}
+      burst: 20
+      max-wait: 2s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

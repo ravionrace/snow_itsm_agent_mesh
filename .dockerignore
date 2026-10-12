@@ -1,0 +1,16 @@
+# Build context is the repo root; only the Java modules and agent-runtime are needed in images.
+.git
+**/target
+**/node_modules
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/*.db
+servicenow
+docs
+deploy/secrets
+deploy/.env
+.github
+.idea
+.vscode
+*.pdf

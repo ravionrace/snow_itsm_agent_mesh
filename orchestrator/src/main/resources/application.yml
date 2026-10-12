@@ -1,0 +1,68 @@
+server:
+  port: ${PORT:8080}
+  error:
+    # Reasons such as "Message not accepted: ..." are written for users and are shown in the ServiceNow Assistant.
+    include-message: always
+
+spring:
+  application:
+    name: orchestrator-api
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          # Corporate IdP (Entra ID, Okta, Ping, ...). Tokens are validated against its published keys.
+          issuer-uri: ${IDP_ISSUER_URI:https://login.example.com/tenant/v2.0}
+          audiences: ${IDP_AUDIENCE:api://itsm-agent-mesh}
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/itsm_mesh}
+
+itsm:
+  # "production" enables start-up checks that refuse unsafe settings (ProductionGuard).
+  environment: ${ITSM_ENVIRONMENT:development}
+  auth:
+    mode: ${AUTH_MODE:JWT}            # JWT | DEV (DEV trusts X-Dev-User; local only)
+    user-claim: ${IDP_USER_CLAIM:preferred_username}
+  runtime:
+    url: ${RUNTIME_URL:http://localhost:8090}
+    api-key: ${RUNTIME_API_KEY:}
+    api-key-file: ${RUNTIME_API_KEY_FILE:}
+    timeout: 180s
+  servicenow:
+    # SIGNED_ASSERTION (production): the mesh's OAuth client gets a short-lived token per user. See docs/servicenow-oauth.md
+    token-mode: ${SN_TOKEN_MODE:SIGNED_ASSERTION}   # SIGNED_ASSERTION | PASSTHROUGH | JWT_BEARER | STATIC (dev only)
+    instance-url: ${SN_INSTANCE_URL:https://example.service-now.com}
+    client-id: ${SN_OAUTH_CLIENT_ID:}
+    client-secret: ${SN_OAUTH_CLIENT_SECRET:}
+    client-secret-file: ${SN_OAUTH_CLIENT_SECRET_FILE:}
+    private-key-file: ${SN_OAUTH_PRIVATE_KEY_FILE:}
+    key-id: ${SN_OAUTH_KEY_ID:}
+    # SSO claim matched to the registry's user field in ServiceNow (e.g. email <-> email, or upn <-> user_name)
+    subject-claim: ${SN_OAUTH_SUBJECT_CLAIM:preferred_username}
+    assertion-ttl: 60s
+    refresh-margin: 5m
+    token-cache-max-users: 10000
+    static-token: ${SN_STATIC_TOKEN:}
+  channel:
+    # ServiceNow in-app Assistant: signed server-to-server calls from the scoped app (see docs/servicenow-assistant.md)
+    enabled: ${CHANNEL_ENABLED:false}
+    secret-file: ${CHANNEL_SECRET_FILE:}
+    secret: ${CHANNEL_SECRET:}
+    max-skew: 5m
+    result-ttl: 15m
+    max-concurrent-turns: 8
+  sessions:
+    store: ${SESSION_STORE:mongo}     # mongo | memory
+    vault-key: ${SESSION_VAULT_KEY:}  # base64 32-byte AES key
+    vault-key-file: ${SESSION_VAULT_KEY_FILE:}
+    ttl: 7d
+  limits:
+    requests-per-minute: 20
+    max-message-chars: 4000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus

@@ -1,0 +1,14 @@
+target/
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+*.db
+deploy/.env
+.idea/
+.vscode/
+.DS_Store
+node_modules/
+dist/
+.now/

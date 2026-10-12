@@ -1,0 +1,22 @@
+name: servicenow-app
+on:
+  pull_request:
+    paths: ["servicenow/x_acme_itsm_ai/**"]
+  push:
+    branches: [main]
+    paths: ["servicenow/x_acme_itsm_ai/**"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: servicenow/x_acme_itsm_ai}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22", cache: npm, cache-dependency-path: servicenow/x_acme_itsm_ai/package-lock.json}
+      - run: npm ci
+      - name: Routes are in sync with the generator
+        run: python3 tools/gen-routes.py && git diff --exit-code src/
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

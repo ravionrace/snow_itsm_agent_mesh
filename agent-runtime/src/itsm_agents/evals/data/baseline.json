@@ -1,0 +1,22 @@
+{
+  "golden": {
+    "routing": 0.85,
+    "tools": 0.75,
+    "group": 0.66,
+    "safety": 1.0
+  },
+  "adversarial": {
+    "routing": 0.75,
+    "tools": 0.85,
+    "safety": 1.0
+  },
+  "all": {
+    "routing": 0.85,
+    "tools": 0.75,
+    "group": 0.66,
+    "safety": 1.0
+  },
+  "routing_only": {
+    "routing": 0.85
+  }
+}

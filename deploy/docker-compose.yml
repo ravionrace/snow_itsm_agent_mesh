@@ -1,0 +1,117 @@
+# Single-host stack, production-shaped: every credential is a Docker secret (a file under /run/secrets), never an
+# environment variable, and only the orchestrator API is published. On Kubernetes, map each secret below to a
+# Secret volume at the same path. Create the files with deploy/scripts/init-secrets.sh, and set up the
+# ServiceNow side with docs/servicenow-oauth.md.
+x-env: &env
+  ITSM_ENVIRONMENT: ${ITSM_ENVIRONMENT:-production}
+
+x-mcp: &mcp
+  restart: unless-stopped
+  networks: [mesh]
+  environment:
+    <<: *env
+    SN_INSTANCE_URL: ${SN_INSTANCE_URL:?set SN_INSTANCE_URL}
+    SN_APP_SCOPE: ${SN_APP_SCOPE:-x_1320561_itsm_ai}
+    SECRETS_DIR: /run/secrets/
+  secrets:
+    - source: mesh_key
+      target: itsm.mcp.mesh-key
+    - source: confirmation_secret
+      target: itsm.mcp.confirmation.secret
+
+services:
+  mongo:
+    image: mongo:8
+    restart: unless-stopped
+    volumes: [mongo:/data/db]
+    networks: [mesh]
+
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: itsm_mesh
+      MYSQL_USER: mesh
+      MYSQL_PASSWORD_FILE: /run/secrets/mysql_password
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    secrets: [mysql_password]
+    volumes: [mysql:/var/lib/mysql]
+    networks: [mesh]
+
+  mcp-incident:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-incident}}
+  mcp-problem:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-problem}}
+  mcp-change:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-change}}
+  mcp-catalog:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-catalog}}
+  mcp-cmdb-kb:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-cmdb-kb}}
+  mcp-access:
+    <<: *mcp
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: mcp-access}}
+
+  agent-runtime:
+    build: {context: .., dockerfile: deploy/runtime.Dockerfile}
+    restart: unless-stopped
+    depends_on: [mongo, mysql, mcp-incident, mcp-problem, mcp-change, mcp-catalog, mcp-cmdb-kb, mcp-access]
+    environment:
+      MESH_ENVIRONMENT: ${ITSM_ENVIRONMENT:-production}
+      MESH_ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+      MESH_RUNTIME_API_KEY_FILE: /run/secrets/runtime_api_key
+      MESH_MCP_MESH_KEY_FILE: /run/secrets/mesh_key
+      MESH_MONGO_URL: mongodb://mongo:27017
+      MESH_DATABASE_URL_FILE: /run/secrets/database_url
+      MESH_MCP_SERVERS: '{"incident":"http://mcp-incident:8081/mcp","problem":"http://mcp-problem:8082/mcp","change":"http://mcp-change:8083/mcp","catalog":"http://mcp-catalog:8084/mcp","cmdb_kb":"http://mcp-cmdb-kb:8085/mcp","access":"http://mcp-access:8086/mcp"}'
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+    secrets: [anthropic_api_key, runtime_api_key, mesh_key, database_url]
+    networks: [mesh]
+
+  orchestrator:
+    build: {context: .., dockerfile: deploy/java.Dockerfile, args: {MODULE: orchestrator}}
+    restart: unless-stopped
+    depends_on: [agent-runtime, mongo]
+    ports: ["8080:8080"]
+    environment:
+      <<: *env
+      AUTH_MODE: JWT
+      IDP_ISSUER_URI: ${IDP_ISSUER_URI:?set IDP_ISSUER_URI}
+      IDP_AUDIENCE: ${IDP_AUDIENCE:?set IDP_AUDIENCE}
+      IDP_USER_CLAIM: ${IDP_USER_CLAIM:-preferred_username}
+      RUNTIME_URL: http://agent-runtime:8090
+      RUNTIME_API_KEY_FILE: /run/secrets/runtime_api_key
+      SN_TOKEN_MODE: SIGNED_ASSERTION
+      SN_INSTANCE_URL: ${SN_INSTANCE_URL:?set SN_INSTANCE_URL}
+      SN_OAUTH_CLIENT_ID: ${SN_OAUTH_CLIENT_ID:?set SN_OAUTH_CLIENT_ID}
+      SN_OAUTH_KEY_ID: ${SN_OAUTH_KEY_ID:?set SN_OAUTH_KEY_ID}
+      SN_OAUTH_SUBJECT_CLAIM: ${SN_OAUTH_SUBJECT_CLAIM:-preferred_username}
+      SN_OAUTH_CLIENT_SECRET_FILE: /run/secrets/sn_oauth_client_secret
+      SN_OAUTH_PRIVATE_KEY_FILE: /run/secrets/sn_oauth_private_key
+      MONGO_URI: mongodb://mongo:27017/itsm_mesh
+      SESSION_STORE: mongo
+      SESSION_VAULT_KEY_FILE: /run/secrets/session_vault_key
+    secrets: [runtime_api_key, sn_oauth_client_secret, sn_oauth_private_key, session_vault_key]
+    networks: [mesh]
+
+secrets:
+  mesh_key: {file: ./secrets/mesh_key}
+  confirmation_secret: {file: ./secrets/confirmation_secret}
+  runtime_api_key: {file: ./secrets/runtime_api_key}
+  session_vault_key: {file: ./secrets/session_vault_key}
+  mysql_password: {file: ./secrets/mysql_password}
+  database_url: {file: ./secrets/database_url}
+  anthropic_api_key: {file: ./secrets/anthropic_api_key}
+  sn_oauth_client_secret: {file: ./secrets/sn_oauth_client_secret}
+  sn_oauth_private_key: {file: ./secrets/sn_oauth_private_key}
+
+networks:
+  mesh: {}
+volumes:
+  mongo: {}
+  mysql: {}
